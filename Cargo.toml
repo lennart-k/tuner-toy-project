@@ -1,5 +1,5 @@
 [package]
-name = "rust-wasm"
+name = "tuner-toy-project"
 version = "0.1.0"
 authors = ["Lennart K <18233294+lennart-k@users.noreply.github.com>"]
 edition = "2018"
