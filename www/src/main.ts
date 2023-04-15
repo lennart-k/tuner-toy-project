@@ -1,4 +1,8 @@
-import {TestAnalyser, test} from 'wasmasd'
+import App from './app.svelte'
 
-console.log(TestAnalyser)
-test()
+const app = new App({
+    target: document.body,
+    props: {
+        tuningFreq: 442
+    }
+})
