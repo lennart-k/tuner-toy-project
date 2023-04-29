@@ -1,6 +1,6 @@
 import App from './app.svelte'
 
-const app = new App({
+globalThis.app = new App({
     target: document.body,
     props: {
         tuningFreq: 442

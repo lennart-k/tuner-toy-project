@@ -1,17 +1,18 @@
 <script lang="ts">
   import Tuner from "./tuner.svelte";
   import { onMount } from "svelte";
-  import { TestAnalyser, EqualTemperament } from "wasmasd";
+  import { EqualTemperament, TimeSignalAnalyser } from "wasmasd";
 
   export let tuningFreq: number;
 
   const fftSize = 32768;
-  // const fftSize = 4096
-  const buffer = new Uint8Array(fftSize);
-  let audioContext: AudioContext|OfflineAudioContext;
+
+  const buffer = new Float32Array(fftSize);
+  let audioContext: AudioContext | OfflineAudioContext;
   let analyser: AnalyserNode;
   let samplerate: number;
-  let testAnalyser: TestAnalyser;
+
+  let timeSignalAnalyser: TimeSignalAnalyser;
 
   let temperament = EqualTemperament.new(tuningFreq);
 
@@ -22,76 +23,51 @@
   let detuningCents: number;
   let currentFrequency: number;
 
+  let tuner: Tuner;
+
   onMount(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       alert("unsupported browser");
       return;
     }
-
-    // Make canvas responsive
-    new ResizeObserver(() => {
-      console.log('resize')
-      canvasElement.width = canvasElement.clientWidth
-      canvasElement.height = canvasElement.clientHeight  
-    }).observe(canvasElement)
     canvasContext = canvasElement.getContext("2d");
   });
 
   async function update() {
-    analyser.getByteFrequencyData(buffer);
+    analyser.getFloatTimeDomainData(buffer);
+    let a = timeSignalAnalyser.digest_chunk(buffer);
+    let maxFreq = (a * samplerate) / fftSize;
+    let freqData = timeSignalAnalyser.fourier_transform(buffer);
 
-    let maxFreq = testAnalyser.get_dominant_frequency(buffer);
-    // console.log(maxFreq);
-    if (!maxFreq) return
+    if (!maxFreq) return;
     let closestResult = temperament.get_closest_note(maxFreq);
     currentNote = closestResult[0];
     detuningCents = closestResult[1];
     currentFrequency = maxFreq;
 
-    canvasContext.clearRect(
-      0,
-      0,
-      canvasElement.width,
-      canvasElement.height
-    );
-    let [boxWidth, boxHeight] = [
-      canvasElement.width / fftSize,
-      (canvasElement.height / fftSize) * 20,
-    ];
-    canvasContext.globalAlpha = 0.9;
-    canvasContext.fillStyle = `hsl(173, 80%, 20%)`;
-    for (const i in buffer) {
-      let pos = canvasElement.width*Math.log2(Number(i))/Math.log2(buffer.length)
-      let pillHeight = boxHeight * buffer[i] * 3;
-      canvasContext.fillRect(
-        pos-4,
-        canvasElement.height - pillHeight,
-        boxWidth + 8,
-        pillHeight
-      );
-    }
+    tuner.updateSpectogram(freqData);
   }
 
   async function start() {
     if (running) return;
     running = true;
     audioContext = new AudioContext({ sampleRate: 44100 });
-    // audioContext.destination.disconnect()
 
     samplerate = audioContext.sampleRate;
-    console.log(samplerate)
     analyser = audioContext.createAnalyser();
-    analyser.fftSize = fftSize;
+    analyser.fftSize = fftSize; // also chunk size for time domain data
     analyser.channelCount = 1;
-    analyser.smoothingTimeConstant = 0;
-    testAnalyser = TestAnalyser.new(tuningFreq, fftSize, samplerate);
+    timeSignalAnalyser = TimeSignalAnalyser.new(fftSize);
     let stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
     });
     let source = audioContext.createMediaStreamSource(stream);
+
     source.connect(analyser);
+
     while (true) {
       await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 50));
       await update();
     }
   }
@@ -99,11 +75,11 @@
 
 <div class="app">
   <Tuner
+    bind:this={tuner}
     on:click={start}
     note={currentNote}
     freq={currentFrequency}
     {detuningCents}
-    bind:canvasElement
   />
 </div>
 

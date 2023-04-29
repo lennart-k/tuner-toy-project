@@ -3,17 +3,23 @@
     <h2>{freq}</h2>
     <p>{Math.round(detuningCents)}</p>
     <DetuningSlider {detuningCents}></DetuningSlider>
-    <canvas bind:this={canvasElement}></canvas>
+    <!-- <ResponsiveCanvas bind:canvasElement></ResponsiveCanvas> -->
+    <Spectogram bind:this={spectogram}></Spectogram>
 </div>
 
 <script lang="ts">
     import DetuningSlider from "./detuningSlider.svelte";
+    import Spectogram from "./spectogram.svelte";
 
     export let note: string;
     export let freq: number
     export let detuningCents: number
-    
-    export let canvasElement: HTMLCanvasElement;
+
+    let spectogram: Spectogram;
+
+    export function updateSpectogram(freqData: Float32Array) {
+      spectogram.update(freqData)
+    }
 </script>
 
 <style>
@@ -36,7 +42,7 @@
         font-weight: bolder;
     }
 
-    canvas {
+    .tuner :global(canvas) {
         width: 100%;
         height: 70%;
         position: absolute;
