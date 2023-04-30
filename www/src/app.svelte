@@ -1,23 +1,19 @@
 <script lang="ts">
   import Tuner from "./tuner.svelte";
   import { onMount } from "svelte";
-  import { EqualTemperament, TimeSignalAnalyser } from "wasmasd";
+  import { EqualTemperament, FourierBuffer } from "wasmasd";
 
   export let tuningFreq: number;
 
   const fftSize = 32768;
 
   const buffer = new Float32Array(fftSize);
-  let audioContext: AudioContext | OfflineAudioContext;
+  let audioContext: AudioContext;
   let analyser: AnalyserNode;
   let samplerate: number;
 
-  let timeSignalAnalyser: TimeSignalAnalyser;
-
+  let fourierBuffer = FourierBuffer.new(fftSize);
   let temperament = EqualTemperament.new(tuningFreq);
-
-  let running = false;
-  let canvasElement: HTMLCanvasElement, canvasContext: CanvasRenderingContext2D;
 
   let currentNote: string;
   let detuningCents: number;
@@ -30,14 +26,14 @@
       alert("unsupported browser");
       return;
     }
-    canvasContext = canvasElement.getContext("2d");
   });
 
   async function update() {
     analyser.getFloatTimeDomainData(buffer);
-    let a = timeSignalAnalyser.digest_chunk(buffer);
-    let maxFreq = (a * samplerate) / fftSize;
-    let freqData = timeSignalAnalyser.fourier_transform(buffer);
+    fourierBuffer.digest_chunk(buffer);
+    let maxBin = fourierBuffer.get_dominant_bin();
+    let maxFreq = (maxBin * samplerate) / fftSize;
+    let freqData = fourierBuffer.get_freq_data()
 
     if (!maxFreq) return;
     let closestResult = temperament.get_closest_note(maxFreq);
@@ -49,15 +45,12 @@
   }
 
   async function start() {
-    if (running) return;
-    running = true;
     audioContext = new AudioContext({ sampleRate: 44100 });
 
     samplerate = audioContext.sampleRate;
     analyser = audioContext.createAnalyser();
     analyser.fftSize = fftSize; // also chunk size for time domain data
     analyser.channelCount = 1;
-    timeSignalAnalyser = TimeSignalAnalyser.new(fftSize);
     let stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
     });

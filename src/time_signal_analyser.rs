@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::utils::set_panic_hook;
+use crate::{buffer_analyser::SignalBuffer, utils::set_panic_hook};
 use rustfft::{num_complex::Complex32, Fft, FftPlanner};
 use wasm_bindgen::prelude::*;
 
@@ -18,11 +18,7 @@ impl TimeSignalAnalyser {
 
         let mut planner = FftPlanner::<f32>::new();
         let fft = planner.plan_fft_forward(fft_size);
-        Self {
-            fft_size,
-            fft,
-            //            internal_state: None,
-        }
+        Self { fft_size, fft }
     }
 
     pub fn fourier_transform(&mut self, data: &[f32]) -> Vec<f32> {
@@ -60,5 +56,11 @@ impl TimeSignalAnalyser {
         }
 
         return Some(bin);
+    }
+
+    pub fn digest_buffer(&mut self, buffer: &SignalBuffer) -> String {
+        buffer.get_length();
+        return format!("{:p}", &buffer);
+        // unsafe { addr_of!(buffer).read_unaligned() }
     }
 }
